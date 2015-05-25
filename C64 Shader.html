@@ -1,0 +1,236 @@
+
+<!doctype html>
+<html lang="en">
+	<head>
+		<title>C64 Shader</title>
+		<meta charset="utf-8">
+		<meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+		<link rel="stylesheet" type="text/css" href="css/style_no_stats.css">
+		<style type="text/css">
+			body {
+				background:#000000;
+			}
+		</style>
+	</head>
+
+	<body>
+
+		<div id="infobutton">
+			<a href="javascript:toggleInfo()"><img src="general/i.png" border="0"></a>
+		</div>
+		<div id="info">
+				<B>C64 Shader - WebGL(html5)</B>
+				<P>Some silly postprocessing to try and get a C64 look, with dithering, pixelation and color-<BR>thresholding.<BR>
+				Just a video to test it on in this case, from the lovely looking <a href="https://www.youtube.com/watch?v=P99qJGrPNLs" target="_blank">trailer for Cyberpunk 2077</a>.<BR><BR>
+				You can also play a bit with the sliders below.</P>
+				<div id="settings"></div>
+				Done using <a href="https://github.com/mrdoob/three.js" target="_blank">three.js</a>.
+				<P><B>Note.</B> You need a modern browser that supports WebGL for this to run the way it is intended.<BR>
+				For example. <a href="http://www.google.com/landing/chrome/beta/" target="_blank">Google Chrome 9+</a> or <a href="http://www.mozilla.com/firefox/beta/" target="_blank">Firefox 4+</a>.<BR><BR>(If you are already using one of those browsers and it's still not running, it's possible that you<BR>have old blacklisted GPU drivers. Try updating the drivers for your graphic card.<BR>Or try to set a '--ignore-gpu-blacklist' switch for the browser.)</P>
+				<font color="#777777">(C) OutsideOfSociety 2014.
+		</div>
+
+		<script src="js/build_r71/three.min.js"></script>
+		<script src="xgui.min.js"></script>
+
+		<script src="js/shaders/CopyShader.js"></script>
+		<script src="js/shaders/DitherShader.js"></script>
+		<script src="js/shaders/PixelateShader.js"></script>
+		<script src="js/shaders/C64Shader.js"></script>
+
+		<script src="js/postprocessing/EffectComposer.js"></script>
+		<script src="js/postprocessing/MaskPass.js"></script>
+		<script src="js/postprocessing/RenderPass.js"></script>
+		<script src="js/postprocessing/ShaderPass.js"></script>
+
+		<script type="text/javascript" src="general/info.js"></script>
+
+
+		<video id="video" autoplay loop style="display:none">
+			<source src="cyberpunk2077.mp3" type='video/mp4; codecs="avc1.42E01E, mp4a.40.2"'>
+			<source src="cyberpunk2077.ogg" type='video/ogg; codecs="theora, vorbis"'>
+		</video>
+
+		<script>
+
+			var container;
+
+			var camera, scene, renderer;
+
+			var has_gl = false;
+
+			var video, texture, mesh;
+
+			var delta;
+			var time;
+			var oldTime;
+
+			var lastScaleTime = 0;
+
+			var effectPixelate;
+
+			var scale = 0.33;
+			var winWidth = window.innerWidth;
+			var winHeight = window.innerHeight;
+			var activeHeight = Math.round(winWidth * (266 / 640));
+
+			init();
+			initGui();
+			animate();
+
+			function initGui () {
+				var gui = new xgui( {width: 240, height: 76, backgroundColor: "#999999", frontColor: "#ffffff", dimColor: "#333333"} );
+				document.getElementById('settings').appendChild( gui.getDomElement() );
+
+				var volumeLabel = new gui.Label( {x: 11, y: 55, text: "Volume"} );
+				var volumeKnob = new gui.CircularSlider( {x: 5, y: 1, radius: 25, value: video.volume, min: 0, max: 1, decimals: 2 } );
+				volumeKnob.value.bind(video, "volume");
+
+				var volumeLabel = new gui.Label( {x: 82, y: 55, text: "DitherScale"} );
+				var scaleKnob = new gui.CircularSlider( {x: 85, y: 1, radius: 25, value: scale, min: 0.1, max: 1, decimals: 2 } );
+				scaleKnob.value.bind(setScale);
+
+				var volumeLabel = new gui.Label( {x: 166, y: 55, text: "Pixelation"} );
+				var pixelKnob = new gui.CircularSlider( {x: 165, y: 1, radius: 25, value: effectPixelate.uniforms[ 'pixelSize' ].value, min: 50, max: 300, decimals: 0 } );
+				pixelKnob.value.bind(effectPixelate.uniforms[ 'pixelSize' ], "value");
+
+			}
+
+			function setScale (v) {
+				if (time < lastScaleTime+100) return;
+				scale = v;
+				onResize(null);
+				lastScaleTime = time;
+
+			}
+
+			function init() {
+
+				container = document.createElement( 'div' );
+				document.body.appendChild( container );
+
+				scene = new THREE.Scene();
+				camera = new THREE.Camera();
+				camera.position.z = 1;
+				scene.add( camera );
+
+				video = document.getElementById( 'video' );
+				video.volume = 0.5;
+
+				texture = new THREE.Texture( video );
+				texture.minFilter = THREE.NearestFilter;
+				texture.magFilter = THREE.NearestFilter;
+				texture.format = THREE.RGBFormat;
+				texture.generateMipmaps = false;
+
+
+				var plane = new THREE.PlaneGeometry(2,2);
+				var material = new THREE.MeshBasicMaterial( {map: texture} );
+
+				mesh = new THREE.Mesh(plane, material);
+				scene.add(mesh);
+
+				try {
+					// renderer
+					renderer = new THREE.WebGLRenderer({antialias: false});
+					renderer.setSize( winWidth, activeHeight );
+
+					// postprocessing
+					renderer.autoClear = false;
+
+					var renderModel = new THREE.RenderPass( scene, camera );
+
+					effectPixelate = new THREE.ShaderPass( THREE.PixelateShader );
+					effectPixelate.uniforms[ 'size' ].value.x = winWidth*scale;
+					effectPixelate.uniforms[ 'size' ].value.y = activeHeight*scale;
+					effectPixelate.uniforms[ 'pixelSize' ].value = 200;
+
+					var effectDither = new THREE.ShaderPass( THREE.DitherShader );
+					var effectC64 = new THREE.ShaderPass( THREE.C64Shader );
+					var effectCopy = new THREE.ShaderPass( THREE.CopyShader );
+					effectCopy.renderToScreen = true;
+
+					var parameters = { minFilter: THREE.NearestFilter, magFilter: THREE.NearestFilter, format: THREE.RGBFormat };
+					var renderTarget = new THREE.WebGLRenderTarget( winWidth*scale, activeHeight*scale, parameters );
+
+					composer = new THREE.EffectComposer( renderer, renderTarget );
+					composer.setSize( winWidth*scale, activeHeight*scale );
+
+					composer.addPass( renderModel );
+					// composer.addPass( effectPixelate );
+					// composer.addPass( effectDither );
+					composer.addPass( effectC64 );
+					composer.addPass( effectCopy );
+
+					renderer.domElement.style.position = "absolute";
+					renderer.domElement.style.top = Math.round((winHeight * 0.5) - (activeHeight * 0.5)) + "px";
+					renderer.domElement.style.left = "0px";
+
+					window.addEventListener( 'resize', onResize, false );
+
+					container.appendChild( renderer.domElement );
+					has_gl = true;
+				}
+				catch (e) {
+					// need webgl
+					document.getElementById('info').innerHTML = "<P><BR><B>Note.</B> You need a modern browser that supports WebGL for this to run the way it is intended.<BR>For example. <a href='http://www.google.com/landing/chrome/beta/' target='_blank'>Google Chrome 9+</a> or <a href='http://www.mozilla.com/firefox/beta/' target='_blank'>Firefox 4+</a>.<BR><BR>If you are already using one of those browsers and still see this message, it's possible that you<BR>have old blacklisted GPU drivers. Try updating the drivers for your graphic card.<BR>Or try to set a '--ignore-gpu-blacklist' switch for the browser.</P><CENTER><BR><img src='../general/WebGL_logo.png' border='0'></CENTER>";
+					document.getElementById('info').style.display = "block";
+					return;
+				}
+
+			}
+
+			function onResize ( event ) {
+				winWidth = window.innerWidth;
+				winHeight = window.innerHeight;
+				activeHeight = Math.round(winWidth * (266 / 640));
+
+				renderer.setSize( winWidth, activeHeight );
+
+				effectPixelate.uniforms[ 'size' ].value.x = winWidth*scale;
+				effectPixelate.uniforms[ 'size' ].value.y = activeHeight*scale;
+
+				composer.setSize( winWidth*scale, activeHeight*scale );
+
+				var parameters = { minFilter: THREE.NearestFilter, magFilter: THREE.NearestFilter, format: THREE.RGBFormat };
+				var renderTarget = new THREE.WebGLRenderTarget( winWidth*scale, activeHeight*scale, parameters );
+				composer.reset(renderTarget);
+
+				renderer.domElement.style.top = Math.round((winHeight * 0.5) - (activeHeight * 0.5)) + "px";
+			}
+
+			function animate() {
+
+				requestAnimationFrame( animate );
+
+				render();
+
+			}
+
+			function render() {
+
+				time = Date.now();
+				delta = time - oldTime;
+				oldTime = time;
+
+				if (isNaN(delta) || delta > 1000 || delta == 0 ) {
+					delta = 1000/60;
+				}
+
+
+				if ( video.readyState === video.HAVE_ENOUGH_DATA ) {
+
+					if ( texture ) texture.needsUpdate = true;
+
+				}
+
+				if (has_gl) {
+					//renderer.clear();
+					composer.render();
+				}
+
+			}
+
+		</script>
+	</body>
+</html>
