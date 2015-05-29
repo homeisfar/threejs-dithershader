@@ -46,10 +46,7 @@
 		<script type="text/javascript" src="general/info.js"></script>
 
 
-		<video id="video" autoplay loop style="display:none">
-			<source src="cyberpunk2077.mp3" type='video/mp4; codecs="avc1.42E01E, mp4a.40.2"'>
-			<source src="cyberpunk2077.ogg" type='video/ogg; codecs="theora, vorbis"'>
-		</video>
+		<img id="image" src="test.jpg" style="display:none">
 
 		<script>
 
@@ -59,7 +56,7 @@
 
 			var has_gl = false;
 
-			var video, texture, mesh;
+			var image, texture, mesh;
 
 			var delta;
 			var time;
@@ -72,7 +69,7 @@
 			var scale = 1.00;
 			var winWidth = window.innerWidth;
 			var winHeight = window.innerHeight;
-			var activeHeight = Math.round(winWidth * (266 / 640));
+			var activeHeight = window.innerHeight;
 
 			init();
 			initGui();
@@ -83,8 +80,8 @@
 				document.getElementById('settings').appendChild( gui.getDomElement() );
 
 				var volumeLabel = new gui.Label( {x: 11, y: 55, text: "Volume"} );
-				var volumeKnob = new gui.CircularSlider( {x: 5, y: 1, radius: 25, value: video.volume, min: 0, max: 1, decimals: 2 } );
-				volumeKnob.value.bind(video, "volume");
+//				var volumeKnob = new gui.CircularSlider( {x: 5, y: 1, radius: 25, value: video.volume, min: 0, max: 1, decimals: 2 } );
+//				volumeKnob.value.bind(video, "volume");
 
 				var volumeLabel = new gui.Label( {x: 82, y: 55, text: "DitherScale"} );
 				var scaleKnob = new gui.CircularSlider( {x: 85, y: 1, radius: 25, value: scale, min: 0.1, max: 1, decimals: 2 } );
@@ -114,10 +111,10 @@
 				camera.position.z = 1;
 				scene.add( camera );
 
-				video = document.getElementById( 'video' );
-				video.volume = 0.5;
+				image = document.getElementById( 'image' );
+//				video.volume = 0.5;
 
-				texture = new THREE.Texture( video );
+				texture = new THREE.Texture( image );
 				texture.minFilter = THREE.NearestFilter;
 				texture.magFilter = THREE.NearestFilter;
 				texture.format = THREE.RGBFormat;
@@ -157,11 +154,10 @@
 					composer.setSize( winWidth*scale, activeHeight*scale );
 
 					composer.addPass( renderModel );
-					// composer.addPass( effectPixelate );
-					
-					composer.addPass( effectDither );
-//                    composer.addPass( effectC64 );
-
+//					 composer.addPass( effectPixelate );
+//					composer.addPass( effectC64 ); 
+                    composer.addPass( effectDither );
+//					composer.addPass( effectC64 ); 
 					composer.addPass( effectCopy );
 
 					renderer.domElement.style.position = "absolute";
@@ -203,8 +199,9 @@
 
 			function animate() {
 
-				requestAnimationFrame( animate );
-
+                setTimeout( function() {
+				    requestAnimationFrame( animate );
+                }, 1000 / 10 );
 				render();
 
 			}
@@ -220,7 +217,7 @@
 				}
 
 
-				if ( video.readyState === video.HAVE_ENOUGH_DATA ) {
+				if ( image.readyState === image.HAVE_ENOUGH_DATA ) {
 
 					if ( texture ) texture.needsUpdate = true;
 

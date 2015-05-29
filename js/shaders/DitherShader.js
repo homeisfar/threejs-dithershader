@@ -182,10 +182,10 @@ THREE.DitherShader = {
 
 		"void main() {",
 
-	
+
 			"vec2 xy = gl_FragCoord.xy * Scale;",
-			"int x = int(mod(xy.x, 8.0));",
-			"int y = int(mod(xy.y, 8.0));",
+			"int x = int(mod(xy.x, 4.0));",
+			"int y = int(mod(xy.y, 4.0));",
 
 			"if (grayScale == 0) {",
 				"vec3 rgb = texture2D(tDiffuse, vUv.xy).rgb;",
@@ -196,7 +196,7 @@ THREE.DitherShader = {
 				"finalRGB.b = find_closest(x, y, rgb.b);",
 
 				"gl_FragColor = vec4(finalRGB, 1.0);",
-			
+
 			"} else {",
 				"vec4 lum = vec4(0.299, 0.587, 0.114, 0.0);",
 				"float grayscale = dot(texture2D(tDiffuse, vUv.xy), lum);",
