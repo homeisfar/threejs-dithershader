@@ -184,8 +184,8 @@ THREE.DitherShader = {
 
 
 			"vec2 xy = gl_FragCoord.xy * Scale;",
-			"int x = int(mod(xy.x, 4.0));",
-			"int y = int(mod(xy.y, 4.0));",
+			"int x = int(mod(xy.x, 2.0));",
+			"int y = int(mod(xy.y, 2.0));",
 
 			"if (grayScale == 0) {",
 				"vec3 rgb = texture2D(tDiffuse, vUv.xy).rgb;",
